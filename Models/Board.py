@@ -1,4 +1,7 @@
+from typing import Callable
+
 from textual import on
+from textual.message import Message
 from textual.app import ComposeResult
 from textual.widgets import Static
 from textual.containers import Horizontal
@@ -15,6 +18,11 @@ from Models import Block
 		.
 		.
 		.
+
+
+	Iterate over ALL blocks, regardless of Row and Column with:
+	for block in BoardObj:
+		print(block.X, block.Y)
 '''
 class Board(Static):
 	'''
@@ -25,7 +33,10 @@ class Board(Static):
 		Board {
 			width: auto;
 			height: auto;
-			border: heavy #404040;			
+			border-top: heavy #C0C0C0;
+			border-right: heavy #B0B0B0;
+			border-bottom: heavy #808080;
+			border-left: heavy white;
 		}
 
 	.BlockRow {
@@ -40,10 +51,21 @@ class Board(Static):
 		self.Height         : int                       		= Height
 		self.Blocks         : list[list[Block.Block]]							# Use Create_Blocks_Matrix to create the 2X2 Matrix
 		self.Weights		: list[int]							= Weights		# A List of Weights when randomly choosing Block Types.
-
+		self.PlayerDied		: bool								= False			# Has the Played Died?
 		self.Create_Blocks_Matrix()												# Create a new self.Blocks List and Generate Random Blocks 
 		self.Set_Adjacent_Bombs_Counts()										# Sets all the square's Adjacent_Bomb_Count attribute
 
+	def __iter__(self):
+		return BoardIterator(self)
+	
+	class BoardStatus(Message):
+		'''			A Message to Pass on Board Status Updates		'''
+		BombCount					: int		= 0
+		RemainingBlockCount			: int		= 0
+		PlayerDied					: bool		= False
+
+
+	
 	def Create_Blocks_Matrix(self):
 		'''		Creates the 2X2 Blocks Matrix, setting each Block to None		'''
 		self.Blocks = []
@@ -82,53 +104,49 @@ class Board(Static):
 
 	def Calculate_Adjacent_Bombs(self, block:Block.Block) -> int:
 		'''		Calculates the Number of Bombs that the given Block is attached to		'''
-		Bombs_Counter: int = 0
-		#BombList:list[Block.Block] = self.Get_Adjacent_Blocks(block=block, AddThisBlock=False)
-		BombList:set[Block.Block] = self.Query_Blocks(AroundBlock=block)
-		
-		for B in BombList:
-			Bombs_Counter += 1 if type(B) is Block.Block_Bomb else 0
+		BombList:set[Block.Block] = self.Query_Blocks(AroundBlock=block, FilterFunc=lambda B: type(B) == Block.Block_Bomb)
+		return len(BombList)
 
-		return Bombs_Counter
-
-	def Reveal_Adjacent_Blocks(self, block:Block.Block, Exclude:list[Block.Block] = []):
+	def Reveal_Adjacent_Blocks(self, block:Block.Block, Exclude:list[Block.Block] = [], Travel:bool=False, DisableBlocks:bool=True):
 		'''
 			Reveals the Blocks Adjacent to the one supplied.
 			Args:
 				Exclude					: A List of Types to exclude, ie: [Block_Bomb]		
+				Travel					: Visit outside of immediate adjacent Blocks when their Adjacent Bomb Count is ZERO
 		'''
-
-		#BlockList: list[Block.Block] = self.Get_Adjacent_Blocks(block = block, AddThisBlock=True)
-		BlockList: set[Block.Block] = self.Query_Blocks(AroundBlock=block)
+		BlockList: set[Block.Block] = self.Query_Blocks(AroundBlock=block, Travel = Travel)
 		BlockList.add(block)
-
 		for B in BlockList:
 			if not type(B) in Exclude:
 				B.Uncovered = True
+				if DisableBlocks: B.disabled = True
 
 
-	def Query_Blocks(self, NoBombs:bool = False, AroundBlock:Block.Block | None = None, MaxLevels:int = 1) -> set[Block.Block]:
+	def Query_Blocks(self, AroundBlock:Block.Block, FilterFunc:Callable | None = None, Travel:bool=True) -> set[Block.Block]:
 		'''
-			Query for Blocks around a given Block, optionally searching neighbours
+			Query for Blocks around a given Block, optionally searching along paths of blocks that have 0 adjacent bombs
 			Args:
 				NoBombs						True = Return No Blocks that are Bombs
 				AroundBlock					The Block to search around. If No Block is provided (None) then
 											the block at (0,0) is used as the starting point
+				Travel						True = Also Visit distance relatives (ie: blocks attached to blocks attached to....)
 				MaxLevels					The Maximum number of Child-Levels to search.
 				 							1 = Only blocks immediately surrounding the AroundBlock are searched
 			Returns:
 				A New Set with the Resultant Blocks, including the ones passed in with AddToSet
 		'''
-		return self._Query_Blocks(NoBombs=NoBombs, AroundBlock=AroundBlock, MaxLevels=MaxLevels)
+		MaxLevels		: int = 99 if Travel else 1
+
+		return self._Query_Blocks(FilterFunc=FilterFunc, AroundBlock=AroundBlock, MaxLevels=MaxLevels)
 
 
-	def _Query_Blocks(self, NoBombs:bool = False,OnlyZeros:bool = False,  AroundBlock:Block.Block | None = None, MaxLevels:int = 1, AddToSet:set[Block.Block] | None = None) -> set[Block.Block]:
+	def _Query_Blocks(self, AroundBlock:Block.Block, FilterFunc:Callable | None = None, MaxLevels:int = 1, AddToSet:set[Block.Block] | None = None) -> set[Block.Block]:
+
+
 		# If no AroundBlock was provided, get the first block from Coords (0,0)
 		BaseBlock:Block.Block = self.Get_Block(X=0, Y=0) if AroundBlock is None else AroundBlock
-		Seed			: bool = AddToSet is None							# True means this is the first time into the function before any recursion
 
 		BlockSet		: set = set() if AddToSet is None else AddToSet		# Ensure we have a set to work with
-		#VisitBlocks		: set = set()										# A Set of Child Blocks to visit if MaxLevels > 1
 
 		StartRow		: int = max(BaseBlock.Y - 1, 0)
 		EndRow			: int = min(self.Height - 1, BaseBlock.Y + 1)
@@ -138,53 +156,107 @@ class Board(Static):
 		for Y in range(StartRow, EndRow + 1):								# range() function stops at .stop-1
 			for X in range(StartCol, EndCol + 1):
 				if X == BaseBlock.X and Y == BaseBlock.Y: continue			# Skip the Block we're inquiring about
-				#Coords.append((X,Y))
 				block:Block.Block = self.Get_Block(X=X, Y=Y)
+				if block in BlockSet: continue								# If the Block is already in the result set, ignore it
 
-				# Apply Filters
-				if NoBombs and type(block) == Block.Block_Bomb:
+				if FilterFunc!= None and not FilterFunc(block):				# If A Filter Function was supplied, call it. Returns False = Filter it out
 					continue
 
-				if OnlyZeros and block.Adjacent_Bomb_Count != 0:
-					continue
+				BlockSet.add(block)
 
-				# If the Block hasn't been added to the set yet, add it and optionally visit its neighbours
-				if not block in BlockSet:								# If the Block hasn't been added yet...
-					BlockSet.add(block)									# Add it, then Visit its Descendants
-
-					# Prevent Recursion overruns
-					if MaxLevels > 1:
-						BlockSet = self._Query_Blocks(
-							NoBombs=NoBombs,
-							OnlyZeros=OnlyZeros,
-							AroundBlock=block,
-							MaxLevels=MaxLevels-1,
-							AddToSet=BlockSet
-						)
+				# Prevent Recursion overruns
+				if MaxLevels > 1 and block.Adjacent_Bomb_Count == 0 and not type(block) == Block.Block_Bomb:
+					BlockSet = self._Query_Blocks(
+						FilterFunc=FilterFunc,
+						AroundBlock=block,
+						MaxLevels=MaxLevels-1,
+						AddToSet=BlockSet
+					)
 
 		return BlockSet
 
 	def Set_Adjacent_Bombs_Counts(self):
 		'''			Sets the Adjacent Bombs Counts on each Tile in the Board		'''
-		Counts:list = []
-		for Row in self.Blocks:
-			for block in Row:
-				BombCount	: int		= self.Calculate_Adjacent_Bombs(block = block)
-				Counts.append(BombCount)
-				block.Adjacent_Bomb_Count = BombCount
-
-		#self.notify(f"Counts={Counts}")
-
-	@on(Block.Block.Click)
-	def Handle_Click(self, Event: Block.Block.Click):
-		#Event.Control.Uncovered = True
-		#self.Reveal_Adjacent_Blocks(Block_X=Event.Control.X, Block_Y=Event.Control.Y)
-		#self.notify(f"{Event.Control.Adjacent_Bomb_Count}")
-		self.Reveal_Adjacent_Blocks(block=Event.Control) #, Exclude=[Block.Block_Bomb])
-
-		match type(Event.Control):
-			case Block.Block_Bomb:
-				self.notify("YOU BLEW UP!!!!")
+		for block in self:
+			BombCount	: int		= self.Calculate_Adjacent_Bombs(block = block)
+			block.Adjacent_Bomb_Count = BombCount
 
 
+	def Get_Bombs_Remaining(self) -> int:
+		return len([B for B in self if not B.Marked and type(B) == Block.Block_Bomb])
 
+
+	def Get_Uncovered_SafeBlocks_Remaining(self) -> int:
+		return len([B for B in self if not B.Uncovered and not type(B) == Block.Block_Bomb])
+
+	def on_click(self, Event):
+		'''			Called when the Played Clicks a Block		'''
+		if Event.control.Uncovered: return											# Don't Process Blocks that are uncovered
+
+		match Event.button:
+			case 1:																	# Left Mouse Button
+				Event.control.Uncovered = True
+				Event.control.disabled = True										# Disable the Block to change its Visual Style
+				match type(Event.control):
+					case Block.Block_Bomb:
+						self.PlayerDied = True
+					case _:															# Default Behaviour for Non-Bombs
+						if Event.control.Adjacent_Bomb_Count == 0:					# Clicked on a Tile with NO Bombs. Auto Reveal All Attached through Zeros
+							self.Reveal_Adjacent_Blocks(block=Event.control, Exclude=[Block.Block_Bomb], Travel=True, DisableBlocks=True)
+
+			case _:																	# Any Mouse Button but the Left One
+				Event.control.Marked = True
+
+		self.Raise_BoardStatus()
+
+
+	def Raise_BoardStatus(self):
+		'''			Raises a "Board Status" Message			'''
+		BS:Board.BoardStatus = Board.BoardStatus()
+		BS.PlayerDied				= self.PlayerDied
+		BS.BombCount				= self.Get_Bombs_Remaining()
+		BS.RemainingBlockCount		= self.Get_Uncovered_SafeBlocks_Remaining()
+		self.post_message(message=BS)
+
+	def DisableBoard(self):
+		self.disabled = True
+
+
+
+
+
+
+class BoardIterator:
+    '''
+        Iterator class for traversing a Board's 2D blocks matrix.
+        Iterates column-by-column across each row, then moves to the next row.
+    '''
+    
+    def __init__(self, board: 'Board'):
+        self.Board = board
+        self.RowIndex = 0
+        self.ColumnIndex = 0
+    
+    def __iter__(self):
+        return self
+    
+    def __next__(self) -> Block.Block:
+        '''
+            Returns the next Block in the 2D matrix.
+            Traverses column-by-column across each row, then moves to the next row.
+            Raises StopIteration when all blocks have been returned.
+        '''
+        # Check if we've reached the end of the matrix
+        if self.RowIndex >= self.Board.Height:
+            raise StopIteration
+        
+        # Get the current block
+        block = self.Board.Get_Block(X=self.ColumnIndex, Y=self.RowIndex)
+        
+        # Move to the next position
+        self.ColumnIndex += 1
+        if self.ColumnIndex >= self.Board.Width:
+            self.ColumnIndex = 0
+            self.RowIndex += 1
+        
+        return block

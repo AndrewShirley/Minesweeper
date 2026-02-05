@@ -9,7 +9,9 @@ class Face(Static):
 		Angry               = 3
 
 	Faces:dict = {
-		FaceTypes.Happy: "HAPPY HAPPY\nJOY JOY"
+		FaceTypes.Happy		: "HAPPY HAPPY\nJOY JOY",
+		FaceTypes.Sad		: "Oh No!!!! :(",
+		FaceTypes.Angry		: "GRRRRRRR!!!!!!!!!!!"
 	}
 
 	FaceStyle           : reactive[FaceTypes]   = reactive(FaceTypes.Happy)           	# This changes the displayed Face Style
@@ -29,7 +31,7 @@ class Face(Static):
 
 
 	def render(self):
-		return ["HELLO","THERE","WHATSUP??"][self.FrameNumber]
+		#return ["HELLO","THERE","WHATSUP??"][self.FrameNumber]
 
 
 		return self.Faces[self.FaceStyle]

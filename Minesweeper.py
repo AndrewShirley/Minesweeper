@@ -1,13 +1,9 @@
 
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Button
-from textual.containers import VerticalScroll
 
-from Models import Block
-from Models import Board
+
 from Models import Game
-from Models import ScoreBoard
-from Models import GameButtons
 
 
 class MinesweeperApp(App):
@@ -23,12 +19,7 @@ class MinesweeperApp(App):
 	def compose(self) -> ComposeResult:
 		yield Header()
 
-		yield GameButtons.GameButtons()
-
-		yield ScoreBoard.ScoreBoard()
-
-		with VerticalScroll(id="BoardContainer"):
-			yield Game.Game()
+		yield Game.Game()
 
 		yield Footer()
 

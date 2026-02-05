@@ -56,9 +56,20 @@ class ScoreBoard(Static):
 			border-title-color: $text-secondary;
 		}
 
+		.EndGameHappy {
+			background: green;
+		}
+
+		.EndGameSad {
+			background: red;
+		}
 	'''
 
-	StartTime         : reactive[float]			= reactive(time())			# Game Start Time
+
+	def __init__(self, *args, **kwargs) -> None:
+		super().__init__(*args, **kwargs)
+		self.TimerStopped			: bool				= False				# Set to True to Stop Incrementing the timer
+		self.StartTime     			: float				= time()			# Game Start Time
 
 	def on_mount(self) -> None:
 		self.set_interval(1, self.Update_Time)
@@ -68,6 +79,7 @@ class ScoreBoard(Static):
 			Update the Timer Widger with the current elapsed seconds since game start
 			This function is called by Textual every second. The Timer is set in .on_mount
 		'''
+		if self.TimerStopped: return
 		ElapsedSeconds:int  =  int(time() - self.StartTime)
 		self.Set_Timer(Value=ElapsedSeconds)
 
@@ -76,6 +88,7 @@ class ScoreBoard(Static):
 			Sets the Value displayed in the "Seconds" Panel
 		'''
 		self.Panel_Timer.update(f"{Value:03}")
+
 
 	def Set_Bombs(self, Value: int):
 		'''
@@ -87,12 +100,12 @@ class ScoreBoard(Static):
 	def compose(self):
 		with Static(id="Container_BombsLeft") as S:
 			S.border_title = "Bombs"
-			self.Panel_BombsCount:Digits = Digits("999", id="BombsLeft")
+			self.Panel_BombsCount			: Digits			= Digits("999", id="BombsLeft")
 			yield self.Panel_BombsCount
 
 		with Static(id="Container_StatusFace") as S:
-			yield Face.Face()
-			#yield Static(":)", id="Face")
+			self.Panel_Face					: Face.Face			= Face.Face()
+			yield self.Panel_Face
 
 		with Static(id="Container_ElapsedTime") as S:
 			S.border_title = "Seconds"
@@ -107,3 +120,31 @@ class ScoreBoard(Static):
 		'''
 		self.StartTime = time()
 
+	def EndGame(self, PlayerDied:bool = True):
+		'''			Places the Scoreboard into an Endgame State		'''
+		self.TimerStopped = True
+		List = self.query_children("Static")
+
+		StyleName:str = ["EndGameHappy", "EndGameSad"][int(PlayerDied)]
+		self.notify(f"Adding Classes {StyleName}")
+		for W in List:
+			W.add_class(StyleName)
+
+	def Set_FaceStyle(self, FaceStyle:str):
+		'''
+			Set the Face Style of the Face in the Face Panel
+			FaceStyle is one of : "Happy", "Sad", "Angry" or any other class member of Face.Face.FaceTypes
+		'''
+		self.Panel_Face.FaceStyle = Face.Face.FaceTypes[FaceStyle]
+
+
+	def Restart(self):
+		'''		Restarts the Panel and sets all the Defaults as though its a new game		'''
+		List = self.query_children("Static")
+		for W in List:
+			W.remove_class("EndGameHappy", "EndGameSad")
+
+		self.Set_FaceStyle("Happy")
+
+		self.StartTime = time()
+		self.TimerStopped = False

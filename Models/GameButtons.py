@@ -17,3 +17,4 @@ class GameButtons(Static):
 		yield Button("SAVE", id="Button_Save")
 		yield Button("LOAD", id="Button_Load")
 		yield Button("NEW", id="Button_NewGame")
+		yield Button("END GAME", id="Button_EndGame")
