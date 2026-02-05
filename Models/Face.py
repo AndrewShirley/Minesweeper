@@ -2,6 +2,51 @@ from textual.widgets import Static
 from textual.reactive import reactive
 from enum import Enum
 
+
+Happy:list[str] = [
+r'''|~~\\   /|\  ||~~/~~\|  |  ||~~|~~|~~\|~~|~~\
+|__/ \ / | \ ||--'--.|  |  ||--|--|__/|--|__/
+|     |  |  \||__\__/ \/ \/ |__|__|   |__|  \ ''',
+
+r'''|__/ \ / | \ ||--'--.|  |  ||--|--|__/|--|__/
+|     |  |  \||__\__/ \/ \/ |__|__|   |__|  \
+
+''',
+
+r'''|     |  |  \||__\__/ \/ \/ |__|__|   |__|  \
+
+''',
+
+'''
+''',
+
+r'''
+
+|~~\\   /|\  ||~~/~~\|  |  ||~~|~~|~~\|~~|~~\ ''',
+
+r'''
+|~~\\   /|\  ||~~/~~\|  |  ||~~|~~|~~\|~~|~~\
+|__/ \ / | \ ||--'--.|  |  ||--|--|__/|--|__/''',
+
+r'''|~~\\   /|\  ||~~/~~\|  |  ||~~|~~|~~\|~~|~~\
+|__/ \ / | \ ||--'--.|  |  ||--|--|__/|--|__/
+|     |  |  \||__\__/ \/ \/ |__|__|   |__|  \ ''',
+
+r'''|~~\\   /|\  ||~~/~~\|  |  ||~~|~~|~~\|~~|~~\
+|__/ \ / | \ ||--'--.|  |  ||--|--|__/|--|__/
+|     |  |  \||__\__/ \/ \/ |__|__|   |__|  \ ''',
+
+
+
+
+]
+
+
+
+
+
+
+
 class Face(Static):
 	class FaceTypes(Enum):
 		Happy               = 1
@@ -9,8 +54,8 @@ class Face(Static):
 		Angry               = 3
 
 	Faces:dict = {
-		FaceTypes.Happy		: "HAPPY HAPPY\nJOY JOY",
-		FaceTypes.Sad		: "Oh No!!!! :(",
+		FaceTypes.Happy		: Happy,
+		FaceTypes.Sad		: ["Oh No!!!! :(", "Try Again!!"],
 		FaceTypes.Angry		: "GRRRRRRR!!!!!!!!!!!"
 	}
 
@@ -19,21 +64,31 @@ class Face(Static):
 
 
 	def on_mount(self) -> None:
-		self.set_interval(1, self.Update_Frame)
+		self.IntervalTimer = self.set_interval(.8, self.Update_Frame)
 
 
 	def Update_Frame(self):
 		NewFrameNumber:int = self.FrameNumber + 1
-		if NewFrameNumber > 2: NewFrameNumber = 0
+		if NewFrameNumber >= self.Get_Frame_Count():
+			NewFrameNumber = 0
 
 		self.FrameNumber = NewFrameNumber
+
+	def Get_Frame_Count(self) -> int:
+		Val = self.Faces[self.FaceStyle]
+		if type(Val) == str: return 1
+		return len(Val)
+
+
+	def Get_Frame_str(self) -> str:
+		Val = self.Faces[self.FaceStyle]
+		if type(Val) == str: return Val
+		return Val[self.FrameNumber]
+
 
 
 
 	def render(self):
-		#return ["HELLO","THERE","WHATSUP??"][self.FrameNumber]
-
-
-		return self.Faces[self.FaceStyle]
+		return self.Get_Frame_str()
 
 

@@ -202,7 +202,7 @@ class Board(Static):
 						self.PlayerDied = True
 					case _:															# Default Behaviour for Non-Bombs
 						if Event.control.Adjacent_Bomb_Count == 0:					# Clicked on a Tile with NO Bombs. Auto Reveal All Attached through Zeros
-							self.Reveal_Adjacent_Blocks(block=Event.control, Exclude=[Block.Block_Bomb], Travel=True, DisableBlocks=True)
+							self.Reveal_Adjacent_Blocks(block=Event.control, Exclude=[Block.Block_Bomb], Travel=True, DisableBlocks=True)							# type: ignore
 
 			case _:																	# Any Mouse Button but the Left One
 				Event.control.Marked = True

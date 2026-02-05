@@ -1,9 +1,19 @@
-A Minesweeper Game written for the Console. This Game uses Textual to place the text characters
-on the screen.
+A Minesweeper Game written in Python for the Console.
 
+This Game uses Textual to place the text characters
+on the screen.
 
 Written by Andrew Shirley, Ontario, Canada
 andrewshirley26@gmail.com
 Started on February 3rd, 2026
 
 Ongoing work :)
+
+Useage:
+
+RunMe.Bat
+
+
+Best used from a Command Prompt in a Windows Terminal: Press Windows-Key, type "Terminal"
+
+
